@@ -4,20 +4,19 @@ import { useState, useRef, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
   Send, 
-  BookOpen, 
-  FileText, 
-  Newspaper, 
-  Brain,
+  MessageSquare,
+  Newspaper,
+  FileEdit,
+  CheckSquare,
   Sparkles,
-  Target,
-  Award,
-  TrendingUp,
-  Clock,
-  CheckCircle,
-  AlertCircle,
+  Image,
+  FileText,
+  Globe,
+  BookOpen,
+  Bell,
+  HelpCircle,
   ChevronRight,
-  Menu,
-  X
+  Zap
 } from 'lucide-react';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080';
@@ -26,33 +25,29 @@ type Message = {
   id: string;
   role: 'user' | 'assistant';
   content: string;
-  mode?: string;
   sources?: any[];
   timestamp: Date;
 };
 
-type Mode = 'general' | 'prelims' | 'mains' | 'current_affairs';
-
-const modes: { id: Mode; label: string; icon: any; description: string }[] = [
-  { id: 'general', label: 'General', icon: Brain, description: 'Ask anything about UPSC' },
-  { id: 'prelims', label: 'Prelims', icon: Target, description: 'MCQ practice & explanations' },
-  { id: 'mains', label: 'Mains', icon: FileText, description: 'Answer writing practice' },
-  { id: 'current_affairs', label: 'Current Affairs', icon: Newspaper, description: 'Latest news & analysis' },
+const menuItems = [
+  { id: 'mentor', label: 'Mentor AI', description: 'Chat-based personalised guidance', icon: MessageSquare, active: true },
+  { id: 'current', label: 'Current Affairs', description: 'Daily briefs with web search', icon: Newspaper },
+  { id: 'mains', label: 'Mains Evaluation', description: 'Upload answers for instant scoring', icon: FileEdit },
+  { id: 'mcq', label: 'MCQ Lab', description: 'Timed prelims simulator', icon: CheckSquare },
 ];
 
-const stats = [
-  { label: 'Prelims Accuracy', value: '94.2%', icon: Target },
-  { label: 'Topics Covered', value: '10,000+', icon: BookOpen },
-  { label: 'Daily Users', value: '50K+', icon: TrendingUp },
-  { label: 'Avg. Response', value: '2.3s', icon: Clock },
+const suggestedQuestions = [
+  'Explain fundamental rights with key articles',
+  'What were India\'s commitments at COP28?',
+  'Analyse the MSP reforms 2024',
+  'Help me practice a mains answer on Uniform Civil Code',
 ];
 
 export default function Home() {
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
-  const [mode, setMode] = useState<Mode>('general');
-  const [showSidebar, setShowSidebar] = useState(false);
+  const [activeMenu, setActiveMenu] = useState('mentor');
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   const scrollToBottom = () => {
@@ -63,14 +58,14 @@ export default function Home() {
     scrollToBottom();
   }, [messages]);
 
-  const sendMessage = async () => {
-    if (!input.trim() || isLoading) return;
+  const sendMessage = async (messageText?: string) => {
+    const text = messageText || input;
+    if (!text.trim() || isLoading) return;
 
     const userMessage: Message = {
       id: Date.now().toString(),
       role: 'user',
-      content: input,
-      mode,
+      content: text,
       timestamp: new Date(),
     };
 
@@ -79,25 +74,27 @@ export default function Home() {
     setIsLoading(true);
 
     try {
-      const response = await fetch(`${API_URL}/api/v1/chat`, {
+      // Call vLLM directly for best results
+      const response = await fetch(`${API_URL.replace(':8080', ':8000')}/v1/chat/completions`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          message: input,
-          mode,
-          use_rag: true,
-          use_reranker: true,
+          model: 'gpt-oss-120b',
+          messages: [
+            { role: 'system', content: 'You are IGNIZE AI, an expert UPSC mentor. Provide detailed, accurate, exam-focused answers with proper structure. Use tables, bullet points, and clear explanations.' },
+            { role: 'user', content: text }
+          ],
+          max_tokens: 1000,
         }),
       });
 
       const data = await response.json();
+      const answer = data.choices?.[0]?.message?.content || 'I apologize, but I encountered an error. Please try again.';
 
       const assistantMessage: Message = {
         id: (Date.now() + 1).toString(),
         role: 'assistant',
-        content: data.answer || 'I apologize, but I encountered an error. Please try again.',
-        mode,
-        sources: data.sources,
+        content: answer,
         timestamp: new Date(),
       };
 
@@ -122,234 +119,212 @@ export default function Home() {
     }
   };
 
+  const today = new Date();
+  const dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+  const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+
   return (
-    <div className="min-h-screen flex flex-col">
-      {/* Header */}
-      <header className="glass-strong sticky top-0 z-50">
-        <div className="max-w-7xl mx-auto px-4 py-4 flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-saffron-500 to-saffron-600 flex items-center justify-center glow-saffron">
-              <Sparkles className="w-6 h-6 text-white" />
-            </div>
-            <div>
-              <h1 className="text-xl font-bold gradient-text">IGNIZE AI</h1>
-              <p className="text-xs text-gray-400">India's #1 UPSC AI Mentor</p>
-            </div>
-          </div>
-
-          {/* Stats - Desktop */}
-          <div className="hidden lg:flex items-center gap-6">
-            {stats.map((stat, i) => (
-              <div key={i} className="flex items-center gap-2">
-                <stat.icon className="w-4 h-4 text-saffron-500" />
-                <div>
-                  <p className="text-sm font-semibold text-white">{stat.value}</p>
-                  <p className="text-xs text-gray-400">{stat.label}</p>
-                </div>
+    <div className="min-h-screen bg-gray-50 flex">
+      {/* Sidebar */}
+      <aside className="w-72 bg-white border-r border-gray-200 flex flex-col">
+        {/* Menu Items */}
+        <div className="p-4 space-y-1">
+          {menuItems.map((item) => (
+            <button
+              key={item.id}
+              onClick={() => setActiveMenu(item.id)}
+              className={`w-full p-3 rounded-xl text-left transition-all flex items-center gap-3 ${
+                item.active || activeMenu === item.id
+                  ? 'bg-violet-50 border-2 border-violet-200'
+                  : 'hover:bg-gray-50'
+              }`}
+            >
+              <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${
+                item.active || activeMenu === item.id ? 'bg-violet-100' : 'bg-gray-100'
+              }`}>
+                <item.icon className={`w-5 h-5 ${
+                  item.active || activeMenu === item.id ? 'text-violet-600' : 'text-gray-500'
+                }`} />
               </div>
-            ))}
-          </div>
+              <div>
+                <p className={`font-semibold text-sm ${
+                  item.active || activeMenu === item.id ? 'text-violet-700' : 'text-gray-700'
+                }`}>{item.label}</p>
+                <p className="text-xs text-gray-500">{item.description}</p>
+              </div>
+            </button>
+          ))}
+        </div>
 
-          <button 
-            onClick={() => setShowSidebar(!showSidebar)}
-            className="lg:hidden p-2 rounded-lg glass"
-          >
-            {showSidebar ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
+        {/* Promo Card */}
+        <div className="mx-4 mt-4 p-4 bg-gradient-to-br from-violet-600 to-violet-700 rounded-2xl text-white">
+          <p className="text-xs font-semibold tracking-wider opacity-90">PRELIMS 2025</p>
+          <p className="font-bold mt-2 text-lg leading-tight">Fast-track your revision with curated tests and mentoring.</p>
+          <button className="mt-4 w-full py-2 bg-white/20 hover:bg-white/30 rounded-lg text-sm font-semibold transition-all">
+            Upgrade to Ignite+
           </button>
         </div>
-      </header>
 
-      <div className="flex-1 flex">
-        {/* Sidebar - Mode Selection */}
-        <AnimatePresence>
-          {(showSidebar || typeof window !== 'undefined' && window.innerWidth >= 1024) && (
-            <motion.aside
-              initial={{ x: -300, opacity: 0 }}
-              animate={{ x: 0, opacity: 1 }}
-              exit={{ x: -300, opacity: 0 }}
-              className="fixed lg:sticky top-[73px] left-0 w-72 h-[calc(100vh-73px)] glass p-4 z-40 overflow-y-auto"
-            >
-              <h2 className="text-sm font-semibold text-gray-400 mb-4 uppercase tracking-wider">
-                Select Mode
-              </h2>
-              <div className="space-y-2">
-                {modes.map((m) => (
-                  <button
-                    key={m.id}
-                    onClick={() => {
-                      setMode(m.id);
-                      setShowSidebar(false);
-                    }}
-                    className={`w-full p-4 rounded-xl text-left transition-all ${
-                      mode === m.id
-                        ? 'bg-gradient-to-r from-saffron-500/20 to-saffron-600/10 border border-saffron-500/50'
-                        : 'glass hover:bg-white/10'
-                    }`}
-                  >
-                    <div className="flex items-center gap-3">
-                      <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${
-                        mode === m.id ? 'bg-saffron-500' : 'bg-navy-700'
-                      }`}>
-                        <m.icon className="w-5 h-5" />
-                      </div>
-                      <div>
-                        <p className="font-semibold">{m.label}</p>
-                        <p className="text-xs text-gray-400">{m.description}</p>
-                      </div>
-                    </div>
-                  </button>
-                ))}
+        {/* Bottom Section */}
+        <div className="mt-auto p-4 border-t border-gray-200">
+          <div className="flex items-center gap-2 text-sm">
+            <Zap className="w-4 h-4 text-green-500" />
+            <span className="text-gray-600">System status:</span>
+            <span className="text-green-500 font-semibold">All green</span>
+          </div>
+          <div className="flex items-center gap-2 text-sm mt-2">
+            <HelpCircle className="w-4 h-4 text-gray-400" />
+            <span className="text-gray-500">Need help?</span>
+            <a href="mailto:support@ignize.ai" className="text-violet-600 font-medium">support@ignize.ai</a>
+          </div>
+          <p className="text-xs text-gray-400 mt-3">© 2025 Ignize AI Labs.</p>
+        </div>
+      </aside>
+
+      {/* Main Content */}
+      <main className="flex-1 flex flex-col">
+        {/* Header */}
+        <header className="bg-white border-b border-gray-200 px-6 py-4 flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <h1 className="text-xl font-bold text-gray-800">Mentor AI</h1>
+            <span className="px-3 py-1 bg-green-100 text-green-700 text-xs font-semibold rounded-full">
+              Real-time RAG
+            </span>
+          </div>
+          <p className="text-sm text-gray-500">Conversational RAG copilot for UPSC prelims & mains</p>
+          
+          <div className="flex items-center gap-4">
+            <button className="flex items-center gap-2 px-4 py-2 bg-violet-50 text-violet-700 rounded-lg text-sm font-medium">
+              <Sparkles className="w-4 h-4" />
+              Prelims 2025 Sprint
+            </button>
+            <div className="text-right">
+              <p className="text-xs text-gray-400">TODAY</p>
+              <p className="text-sm font-semibold text-gray-700">{dayNames[today.getDay()]}, {today.getDate()} {monthNames[today.getMonth()]}</p>
+            </div>
+            <button className="p-2 hover:bg-gray-100 rounded-lg">
+              <Bell className="w-5 h-5 text-gray-500" />
+            </button>
+            <div className="flex items-center gap-2">
+              <div className="w-9 h-9 bg-violet-100 rounded-full flex items-center justify-center text-violet-700 font-semibold text-sm">
+                SS
               </div>
+              <div>
+                <p className="text-sm font-semibold text-gray-700">Shushruth</p>
+                <p className="text-xs text-gray-400">Ignite+ beta</p>
+              </div>
+            </div>
+          </div>
+        </header>
 
-              {/* Quick Actions */}
-              <div className="mt-8">
-                <h2 className="text-sm font-semibold text-gray-400 mb-4 uppercase tracking-wider">
-                  Quick Start
-                </h2>
-                <div className="space-y-2">
-                  {[
-                    'Explain Article 370',
-                    'GST and federalism',
-                    'Climate change on agriculture',
-                    'Judicial activism pros & cons',
-                  ].map((prompt, i) => (
+        {/* Chat Area */}
+        <div className="flex-1 overflow-y-auto p-6">
+          {messages.length === 0 ? (
+            <div className="max-w-2xl mx-auto text-center py-12">
+              {/* Welcome Icon */}
+              <div className="w-16 h-16 bg-violet-100 rounded-2xl flex items-center justify-center mx-auto mb-6">
+                <Sparkles className="w-8 h-8 text-violet-600" />
+              </div>
+              
+              <h2 className="text-2xl font-bold text-gray-800 mb-2">Welcome to Ignize AI</h2>
+              <p className="text-gray-500 mb-8">Your AI-powered UPSC assistant. Ask me anything or upload documents to get started.</p>
+              
+              {/* Suggested Questions */}
+              <div className="text-left mb-8">
+                <p className="text-sm font-medium text-gray-600 mb-4">Try asking:</p>
+                <div className="grid grid-cols-2 gap-3">
+                  {suggestedQuestions.map((question, i) => (
                     <button
                       key={i}
-                      onClick={() => setInput(prompt)}
-                      className="w-full p-3 rounded-lg glass text-left text-sm hover:bg-white/10 flex items-center gap-2"
+                      onClick={() => sendMessage(question)}
+                      className="p-4 bg-white border border-gray-200 rounded-xl text-left text-sm text-gray-700 hover:border-violet-300 hover:bg-violet-50 transition-all"
                     >
-                      <ChevronRight className="w-4 h-4 text-saffron-500" />
-                      {prompt}
+                      {question}
                     </button>
                   ))}
                 </div>
               </div>
-            </motion.aside>
-          )}
-        </AnimatePresence>
-
-        {/* Main Chat Area */}
-        <main className="flex-1 flex flex-col max-w-4xl mx-auto w-full">
-          {/* Messages */}
-          <div className="flex-1 overflow-y-auto p-4 space-y-6">
-            {messages.length === 0 ? (
-              <motion.div
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                className="h-full flex flex-col items-center justify-center text-center p-8"
-              >
-                <div className="w-20 h-20 rounded-2xl bg-gradient-to-br from-saffron-500 to-saffron-600 flex items-center justify-center mb-6 glow-saffron">
-                  <Sparkles className="w-10 h-10 text-white" />
-                </div>
-                <h2 className="text-3xl font-bold mb-2">
-                  Welcome to <span className="gradient-text">IGNIZE AI</span>
-                </h2>
-                <p className="text-gray-400 max-w-md mb-8">
-                  Your AI-powered UPSC mentor. Ask me anything about Prelims, Mains, 
-                  or Current Affairs. I'll provide accurate, well-researched answers.
-                </p>
-                
-                {/* Mode badges */}
-                <div className="flex flex-wrap justify-center gap-3">
-                  {modes.map((m) => (
-                    <button
-                      key={m.id}
-                      onClick={() => setMode(m.id)}
-                      className={`px-4 py-2 rounded-full text-sm font-medium transition-all ${
-                        mode === m.id
-                          ? 'bg-saffron-500 text-white'
-                          : 'glass hover:bg-white/10'
-                      }`}
-                    >
-                      {m.label}
-                    </button>
-                  ))}
-                </div>
-              </motion.div>
-            ) : (
-              messages.map((message) => (
+            </div>
+          ) : (
+            <div className="max-w-3xl mx-auto space-y-6">
+              {messages.map((message) => (
                 <motion.div
                   key={message.id}
-                  initial={{ opacity: 0, y: 20 }}
+                  initial={{ opacity: 0, y: 10 }}
                   animate={{ opacity: 1, y: 0 }}
                   className={`flex ${message.role === 'user' ? 'justify-end' : 'justify-start'}`}
                 >
-                  <div
-                    className={`max-w-[85%] p-4 rounded-2xl ${
-                      message.role === 'user'
-                        ? 'bg-gradient-to-r from-saffron-500 to-saffron-600 rounded-br-sm'
-                        : 'glass rounded-bl-sm'
-                    }`}
-                  >
-                    <p className="whitespace-pre-wrap">{message.content}</p>
-                    
-                    {message.sources && message.sources.length > 0 && (
-                      <div className="mt-3 pt-3 border-t border-white/10">
-                        <p className="text-xs text-gray-400 mb-2">Sources:</p>
-                        <div className="flex flex-wrap gap-2">
-                          {message.sources.slice(0, 3).map((source, i) => (
-                            <span
-                              key={i}
-                              className="px-2 py-1 rounded-md bg-navy-700 text-xs"
-                            >
-                              {source.filename || source.source || `Source ${i + 1}`}
-                            </span>
-                          ))}
-                        </div>
-                      </div>
-                    )}
+                  <div className={`max-w-[80%] p-4 rounded-2xl ${
+                    message.role === 'user'
+                      ? 'bg-violet-600 text-white'
+                      : 'bg-white border border-gray-200 text-gray-800'
+                  }`}>
+                    <p className="whitespace-pre-wrap text-sm leading-relaxed">{message.content}</p>
                   </div>
                 </motion.div>
-              ))
-            )}
-
-            {isLoading && (
-              <motion.div
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                className="flex justify-start"
-              >
-                <div className="glass p-4 rounded-2xl rounded-bl-sm">
-                  <div className="flex items-center gap-2">
-                    <span className="w-2 h-2 rounded-full bg-saffron-500 typing-dot" />
-                    <span className="w-2 h-2 rounded-full bg-saffron-500 typing-dot" />
-                    <span className="w-2 h-2 rounded-full bg-saffron-500 typing-dot" />
+              ))}
+              
+              {isLoading && (
+                <div className="flex justify-start">
+                  <div className="bg-white border border-gray-200 p-4 rounded-2xl">
+                    <div className="flex items-center gap-2">
+                      <span className="w-2 h-2 rounded-full bg-violet-500 animate-bounce" style={{ animationDelay: '0ms' }} />
+                      <span className="w-2 h-2 rounded-full bg-violet-500 animate-bounce" style={{ animationDelay: '150ms' }} />
+                      <span className="w-2 h-2 rounded-full bg-violet-500 animate-bounce" style={{ animationDelay: '300ms' }} />
+                    </div>
                   </div>
                 </div>
-              </motion.div>
-            )}
-            
-            <div ref={messagesEndRef} />
-          </div>
+              )}
+              
+              <div ref={messagesEndRef} />
+            </div>
+          )}
+        </div>
 
-          {/* Input Area */}
-          <div className="p-4 glass-strong">
-            <div className="flex items-center gap-3">
-              <div className="flex-1 relative">
-                <textarea
-                  value={input}
-                  onChange={(e) => setInput(e.target.value)}
-                  onKeyPress={handleKeyPress}
-                  placeholder={`Ask about ${mode === 'prelims' ? 'Prelims MCQs' : mode === 'mains' ? 'Mains answers' : 'UPSC topics'}...`}
-                  className="w-full p-4 pr-12 rounded-xl bg-navy-800 border border-white/10 focus:border-saffron-500 focus:ring-2 focus:ring-saffron-500/20 outline-none resize-none text-white placeholder-gray-500"
-                  rows={1}
-                />
-              </div>
+        {/* Input Area */}
+        <div className="bg-white border-t border-gray-200 p-4">
+          <div className="max-w-3xl mx-auto">
+            {/* Action Buttons */}
+            <div className="flex items-center gap-2 mb-3">
+              <button className="flex items-center gap-2 px-4 py-2 bg-gray-100 hover:bg-gray-200 rounded-lg text-sm text-gray-600 transition-all">
+                <Image className="w-4 h-4" />
+                Photo
+              </button>
+              <button className="flex items-center gap-2 px-4 py-2 bg-gray-100 hover:bg-gray-200 rounded-lg text-sm text-gray-600 transition-all">
+                <FileText className="w-4 h-4" />
+                PDF
+              </button>
+              <button className="flex items-center gap-2 px-4 py-2 bg-gray-100 hover:bg-gray-200 rounded-lg text-sm text-gray-600 transition-all">
+                <Globe className="w-4 h-4" />
+                Web Search
+              </button>
+              <button className="flex items-center gap-2 px-4 py-2 bg-gray-100 hover:bg-gray-200 rounded-lg text-sm text-gray-600 transition-all">
+                <BookOpen className="w-4 h-4" />
+                Sources
+              </button>
+            </div>
+            
+            {/* Input Field */}
+            <div className="relative">
+              <textarea
+                value={input}
+                onChange={(e) => setInput(e.target.value)}
+                onKeyPress={handleKeyPress}
+                placeholder="Ask anything about UPSC preparation..."
+                className="w-full p-4 pr-14 bg-gray-50 border border-gray-200 rounded-xl focus:border-violet-400 focus:ring-2 focus:ring-violet-100 outline-none resize-none text-gray-800 placeholder-gray-400"
+                rows={2}
+              />
               <button
-                onClick={sendMessage}
+                onClick={() => sendMessage()}
                 disabled={isLoading || !input.trim()}
-                className="p-4 rounded-xl bg-gradient-to-r from-saffron-500 to-saffron-600 hover:from-saffron-600 hover:to-saffron-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all glow-saffron"
+                className="absolute right-3 bottom-3 p-2 bg-violet-600 hover:bg-violet-700 disabled:bg-gray-300 rounded-lg text-white transition-all"
               >
                 <Send className="w-5 h-5" />
               </button>
             </div>
-            <p className="text-xs text-gray-500 mt-2 text-center">
-              IGNIZE AI uses RAG with reranking for accurate, source-backed answers.
-              Mode: <span className="text-saffron-500 font-medium">{mode}</span>
-            </p>
           </div>
-        </main>
-      </div>
+        </div>
+      </main>
     </div>
   );
 }
