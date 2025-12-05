@@ -98,7 +98,7 @@ export default function Home() {
             { role: 'system', content: systemPrompt },
             { role: 'user', content: text }
           ],
-          max_tokens: 1000,
+          max_tokens: 2000,
         }),
       });
 
