@@ -48,6 +48,8 @@ export default function Home() {
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [activeMenu, setActiveMenu] = useState('mentor');
+  const [useWebSearch, setUseWebSearch] = useState(false);
+  const [useRAG, setUseRAG] = useState(true);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   const scrollToBottom = () => {
@@ -74,8 +76,8 @@ export default function Home() {
     setIsLoading(true);
 
     try {
-      // Call vLLM directly for best results
-      const response = await fetch(`${API_URL.replace(':8080', ':8000')}/v1/chat/completions`, {
+      // Use Next.js API proxy to avoid CORS issues
+      const response = await fetch('/api/vllm', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -88,6 +90,10 @@ export default function Home() {
         }),
       });
 
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+      }
+
       const data = await response.json();
       const answer = data.choices?.[0]?.message?.content || 'I apologize, but I encountered an error. Please try again.';
 
@@ -99,11 +105,12 @@ export default function Home() {
       };
 
       setMessages(prev => [...prev, assistantMessage]);
-    } catch (error) {
+    } catch (error: any) {
+      console.error('API Error:', error);
       const errorMessage: Message = {
         id: (Date.now() + 1).toString(),
         role: 'assistant',
-        content: 'Sorry, I\'m having trouble connecting. Please check if the server is running.',
+        content: `Sorry, I'm having trouble connecting. ${error.message || 'Please check if the server is running.'}`,
         timestamp: new Date(),
       };
       setMessages(prev => [...prev, errorMessage]);
