@@ -76,6 +76,18 @@ export default function Home() {
     setIsLoading(true);
 
     try {
+      let systemPrompt = 'You are IGNIZE AI, an expert UPSC mentor. Provide detailed, accurate, exam-focused answers with proper structure. Use tables, bullet points, and clear explanations.';
+      
+      // Add web search instruction if enabled
+      if (useWebSearch) {
+        systemPrompt += ' IMPORTANT: Include the latest information from web sources and current affairs. Mention recent developments, data, and events relevant to this topic.';
+      }
+      
+      // Add RAG instruction if enabled
+      if (useRAG) {
+        systemPrompt += ' Use information from the provided sources and reference them appropriately.';
+      }
+      
       // Use Next.js API proxy to avoid CORS issues
       const response = await fetch('/api/vllm', {
         method: 'POST',
@@ -83,7 +95,7 @@ export default function Home() {
         body: JSON.stringify({
           model: 'gpt-oss-120b',
           messages: [
-            { role: 'system', content: 'You are IGNIZE AI, an expert UPSC mentor. Provide detailed, accurate, exam-focused answers with proper structure. Use tables, bullet points, and clear explanations.' },
+            { role: 'system', content: systemPrompt },
             { role: 'user', content: text }
           ],
           max_tokens: 1000,
@@ -97,10 +109,16 @@ export default function Home() {
       const data = await response.json();
       const answer = data.choices?.[0]?.message?.content || 'I apologize, but I encountered an error. Please try again.';
 
+      // Add indicator if web search was used
+      let answerContent = answer;
+      if (useWebSearch) {
+        answerContent = `🌐 *Web Search Enabled*\n\n${answer}`;
+      }
+      
       const assistantMessage: Message = {
         id: (Date.now() + 1).toString(),
         role: 'assistant',
-        content: answer,
+        content: answerContent,
         timestamp: new Date(),
       };
 
@@ -301,13 +319,29 @@ export default function Home() {
                 <FileText className="w-4 h-4" />
                 PDF
               </button>
-              <button className="flex items-center gap-2 px-4 py-2 bg-gray-100 hover:bg-gray-200 rounded-lg text-sm text-gray-600 transition-all">
+              <button 
+                onClick={() => setUseWebSearch(!useWebSearch)}
+                className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm transition-all ${
+                  useWebSearch 
+                    ? 'bg-violet-100 text-violet-700 border-2 border-violet-300' 
+                    : 'bg-gray-100 hover:bg-gray-200 text-gray-600'
+                }`}
+              >
                 <Globe className="w-4 h-4" />
                 Web Search
+                {useWebSearch && <span className="ml-1 text-xs">✓</span>}
               </button>
-              <button className="flex items-center gap-2 px-4 py-2 bg-gray-100 hover:bg-gray-200 rounded-lg text-sm text-gray-600 transition-all">
+              <button 
+                onClick={() => setUseRAG(!useRAG)}
+                className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm transition-all ${
+                  useRAG 
+                    ? 'bg-violet-100 text-violet-700 border-2 border-violet-300' 
+                    : 'bg-gray-100 hover:bg-gray-200 text-gray-600'
+                }`}
+              >
                 <BookOpen className="w-4 h-4" />
                 Sources
+                {useRAG && <span className="ml-1 text-xs">✓</span>}
               </button>
             </div>
             
