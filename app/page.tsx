@@ -76,43 +76,72 @@ export default function Home() {
     setIsLoading(true);
 
     try {
-      let systemPrompt = 'You are IGNIZE AI, an expert UPSC mentor. Provide detailed, accurate, exam-focused answers with proper structure. Use tables, bullet points, and clear explanations.';
+      let answer = '';
+      let sourcesInfo = '';
       
-      // Add web search instruction if enabled
+      // If web search is enabled, first fetch from UPSC sources
       if (useWebSearch) {
-        systemPrompt += ' IMPORTANT: Include the latest information from web sources and current affairs. Mention recent developments, data, and events relevant to this topic.';
+        try {
+          const webSearchResponse = await fetch('/api/web-search', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ query: text }),
+          });
+          
+          if (webSearchResponse.ok) {
+            const webData = await webSearchResponse.json();
+            if (webData.answer) {
+              answer = webData.answer;
+              sourcesInfo = webData.sources_used?.join(', ') || '';
+            }
+          }
+        } catch (webError) {
+          console.log('Web search fallback to LLM:', webError);
+        }
       }
       
-      // Add RAG instruction if enabled
-      if (useRAG) {
-        systemPrompt += ' Use information from the provided sources and reference them appropriately.';
+      // If no web search result, use LLM directly
+      if (!answer) {
+        // Clean system prompt - no excessive formatting
+        let systemPrompt = `You are IGNIZE AI, a UPSC expert mentor. 
+
+IMPORTANT RULES:
+- Keep responses crisp and exam-focused
+- Use simple bullet points (-)
+- Avoid excessive markdown symbols (no **, ##, etc.)
+- Include key facts, dates, and figures
+- End with "UPSC Relevance: [Paper] - [Topic]"
+- Maximum 300 words unless asked for detailed answer`;
+        
+        if (useRAG) {
+          systemPrompt += '\n- Reference relevant sources when available.';
+        }
+        
+        const response = await fetch('/api/vllm', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            model: 'gpt-oss-120b',
+            messages: [
+              { role: 'system', content: systemPrompt },
+              { role: 'user', content: text }
+            ],
+            max_tokens: 2000,
+          }),
+        });
+
+        if (!response.ok) {
+          throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+        }
+
+        const data = await response.json();
+        answer = data.choices?.[0]?.message?.content || 'I apologize, but I encountered an error. Please try again.';
       }
-      
-      // Use Next.js API proxy to avoid CORS issues
-      const response = await fetch('/api/vllm', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          model: 'gpt-oss-120b',
-          messages: [
-            { role: 'system', content: systemPrompt },
-            { role: 'user', content: text }
-          ],
-          max_tokens: 2000,
-        }),
-      });
 
-      if (!response.ok) {
-        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-      }
-
-      const data = await response.json();
-      const answer = data.choices?.[0]?.message?.content || 'I apologize, but I encountered an error. Please try again.';
-
-      // Add indicator if web search was used
+      // Add source indicator if web search was used
       let answerContent = answer;
-      if (useWebSearch) {
-        answerContent = `🌐 *Web Search Enabled*\n\n${answer}`;
+      if (useWebSearch && sourcesInfo) {
+        answerContent = `Sources: ${sourcesInfo}\n\n${answer}`;
       }
       
       const assistantMessage: Message = {
