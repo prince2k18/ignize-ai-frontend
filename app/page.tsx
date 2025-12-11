@@ -25,7 +25,7 @@ type Message = {
   id: string;
   role: 'user' | 'assistant';
   content: string;
-  sources?: any[];
+  sources?: string[];
   timestamp: Date;
 };
 
@@ -64,6 +64,27 @@ export default function Home() {
     const text = messageText || input;
     if (!text.trim() || isLoading) return;
 
+    const formatSources = (rawSources: any): string[] => {
+      if (!Array.isArray(rawSources)) return [];
+      return rawSources
+        .map((src) => {
+          if (typeof src === 'string') return src;
+          if (!src || typeof src !== 'object') return null;
+
+          const label =
+            src.citation ||
+            src.filename ||
+            src.source ||
+            (src.document_id as string) ||
+            'Source';
+          const page = src.page ? `p.${src.page}` : null;
+          const chunk = src.chunk_id ? `#${src.chunk_id}` : null;
+          const parts = [label, page, chunk].filter(Boolean);
+          return parts.join(' • ');
+        })
+        .filter(Boolean) as string[];
+    };
+
     const userMessage: Message = {
       id: Date.now().toString(),
       role: 'user',
@@ -77,7 +98,7 @@ export default function Home() {
 
     try {
       let answer = '';
-      let sourcesInfo = '';
+      let sourcesInfo: string[] = [];
       
       // If web search is enabled, first fetch from UPSC sources
       if (useWebSearch) {
@@ -92,7 +113,9 @@ export default function Home() {
             const webData = await webSearchResponse.json();
             if (webData.answer) {
               answer = webData.answer;
-              sourcesInfo = webData.sources_used?.join(', ') || '';
+              sourcesInfo = Array.isArray(webData.sources_used)
+                ? webData.sources_used
+                : [];
             }
           }
         } catch (webError) {
@@ -100,7 +123,31 @@ export default function Home() {
         }
       }
       
-      // If no web search result, use LLM directly
+      // If no web search result and RAG is enabled, call unified chat (API Gateway)
+      if (!answer && useRAG) {
+        try {
+          const chatResponse = await fetch('/api/chat', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              message: text,
+              mode: 'general',
+              use_rag: true,
+              use_reranker: true,
+            }),
+          });
+
+          if (chatResponse.ok) {
+            const chatData = await chatResponse.json();
+            answer = chatData.answer || '';
+            sourcesInfo = formatSources(chatData.sources);
+          }
+        } catch (chatError) {
+          console.log('RAG chat fallback to LLM:', chatError);
+        }
+      }
+
+      // If still no answer, use direct LLM
       if (!answer) {
         // Clean system prompt - no excessive formatting
         let systemPrompt = `You are IGNIZE AI, a UPSC expert mentor. 
@@ -140,14 +187,15 @@ IMPORTANT RULES:
 
       // Add source indicator if web search was used
       let answerContent = answer;
-      if (useWebSearch && sourcesInfo) {
-        answerContent = `Sources: ${sourcesInfo}\n\n${answer}`;
+      if (useWebSearch && sourcesInfo.length > 0) {
+        answerContent = answer;
       }
       
       const assistantMessage: Message = {
         id: (Date.now() + 1).toString(),
         role: 'assistant',
         content: answerContent,
+        sources: sourcesInfo.length ? sourcesInfo : undefined,
         timestamp: new Date(),
       };
 
@@ -314,6 +362,18 @@ IMPORTANT RULES:
                       : 'bg-white border border-gray-200 text-gray-800'
                   }`}>
                     <p className="whitespace-pre-wrap text-sm leading-relaxed">{message.content}</p>
+                {message.role === 'assistant' && message.sources && message.sources.length > 0 && (
+                  <div className="mt-3 flex flex-wrap gap-2">
+                    {message.sources.map((src, idx) => (
+                      <span
+                        key={idx}
+                        className="rounded-full bg-gray-100 px-3 py-1 text-xs text-gray-700 border border-gray-200"
+                      >
+                        {src}
+                      </span>
+                    ))}
+                  </div>
+                )}
                   </div>
                 </motion.div>
               ))}

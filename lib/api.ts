@@ -91,7 +91,7 @@ export async function uploadDocument(file: File): Promise<{ status: string; docu
 
 export async function uploadImage(file: File): Promise<{ status: string; analysis: string }> {
   // For now, images are processed similarly to documents
-  // In the future, this will call OCR service (Qwen2-VL)
+  // In the future, this will call OCR service (OLMOCR/Chandra/EasyOCR)
   const formData = new FormData()
   formData.append('file', file)
 

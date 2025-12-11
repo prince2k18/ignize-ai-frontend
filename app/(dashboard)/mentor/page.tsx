@@ -19,7 +19,13 @@ import {
 type Message = {
   role: 'user' | 'assistant'
   content: string
-  sources?: Array<{ filename: string; page: string | number; similarity_score: number }>
+  sources?: Array<{
+    filename?: string
+    page?: string | number
+    chunk_id?: string
+    citation?: string
+    similarity_score?: number
+  }>
   timestamp: Date
 }
 
@@ -175,15 +181,25 @@ export default function MentorPage() {
                   {showSources && message.sources && message.sources.length > 0 && (
                     <div className="mt-3 space-y-2 border-t border-gray-200 pt-3">
                       <p className="text-xs font-semibold text-gray-500">Sources:</p>
-                      {message.sources.map((source, sIdx) => (
-                        <div
-                          key={sIdx}
-                          className="rounded-lg bg-gray-50 px-3 py-2 text-xs"
-                        >
-                          <p className="font-medium text-gray-700">{source.filename}</p>
-                          <p className="text-gray-500">Page {source.page}</p>
-                        </div>
-                      ))}
+                      <div className="flex flex-wrap gap-2">
+                        {message.sources.map((source, sIdx) => {
+                          const label =
+                            source.citation ||
+                            source.filename ||
+                            source.chunk_id ||
+                            'Source';
+                          const pageInfo = source.page ? ` • p.${source.page}` : '';
+                          const idInfo = source.chunk_id ? ` • ${source.chunk_id}` : '';
+                          return (
+                            <span
+                              key={sIdx}
+                              className="rounded-full bg-gray-100 px-3 py-1 text-xs text-gray-700"
+                            >
+                              {label}{pageInfo}{idInfo}
+                            </span>
+                          );
+                        })}
+                      </div>
                     </div>
                   )}
                 </div>

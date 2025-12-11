@@ -11,6 +11,7 @@ import {
   HelpCircle,
   X,
   PenTool,
+  BarChart3,
 } from 'lucide-react'
 import { useMemo } from 'react'
 
@@ -43,6 +44,12 @@ const navItems = [
     description: 'Timed prelims simulator',
     href: '/mcqs',
     icon: CheckSquare,
+  },
+  {
+    label: 'Metrics AI',
+    description: 'UPSC solver performance analytics',
+    href: '/metrics',
+    icon: BarChart3,
   },
   {
     label: 'Handwriting OCR',
@@ -90,19 +97,17 @@ export default function Sidebar({ isMobileOpen, onClose }: SidebarProps) {
                 key={item.href}
                 href={item.href}
                 onClick={onClose}
-                className={`group block rounded-2xl border px-4 py-3 transition-all ${
-                  active
+                className={`group block rounded-2xl border px-4 py-3 transition-all ${active
                     ? 'border-primary/30 bg-primary/5 text-primary'
                     : 'border-transparent bg-slate-50 text-slate-600 hover:-translate-y-0.5 hover:border-slate-200 hover:bg-white hover:text-slate-900'
-                }`}
+                  }`}
               >
                 <div className="flex items-center gap-3">
                   <div
-                    className={`rounded-xl p-2 ${
-                      active
+                    className={`rounded-xl p-2 ${active
                         ? 'bg-primary/10 text-primary'
                         : 'bg-white text-slate-500 group-hover:text-primary'
-                    }`}
+                      }`}
                   >
                     <Icon className="h-5 w-5" />
                   </div>
@@ -151,15 +156,13 @@ export default function Sidebar({ isMobileOpen, onClose }: SidebarProps) {
 
       {/* Mobile overlay */}
       <div
-        className={`fixed inset-0 z-40 bg-slate-900/60 backdrop-blur-sm transition-opacity duration-300 xl:hidden ${
-          isMobileOpen ? 'opacity-100' : 'pointer-events-none opacity-0'
-        }`}
+        className={`fixed inset-0 z-40 bg-slate-900/60 backdrop-blur-sm transition-opacity duration-300 xl:hidden ${isMobileOpen ? 'opacity-100' : 'pointer-events-none opacity-0'
+          }`}
         onClick={onClose}
       />
       <div
-        className={`fixed inset-y-0 left-0 z-50 w-72 transform border-r border-slate-100 bg-white shadow-2xl transition-transform duration-300 xl:hidden ${
-          isMobileOpen ? 'translate-x-0' : '-translate-x-full'
-        }`}
+        className={`fixed inset-y-0 left-0 z-50 w-72 transform border-r border-slate-100 bg-white shadow-2xl transition-transform duration-300 xl:hidden ${isMobileOpen ? 'translate-x-0' : '-translate-x-full'
+          }`}
       >
         {content}
       </div>
