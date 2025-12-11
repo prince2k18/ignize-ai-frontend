@@ -3,28 +3,38 @@
 import { useState } from 'react'
 import {
     BarChart3,
-    TrendingUp,
     Target,
-    AlertCircle,
     CheckCircle,
     XCircle,
     Loader2,
     Play,
     RefreshCw,
+    Clock,
+    Award,
 } from 'lucide-react'
 
 type MetricsResult = {
     totalQuestions: number
     correctAnswers: number
     accuracy: number
-    llmCalls: number
-    totalTokens: number
     timeSeconds: number
     incorrectQuestions: Array<{
         id: number
         selected: string
         correct: string
     }>
+}
+
+// UPSC Marking Scheme: +2 for correct, -0.5 for wrong
+const calculateMarks = (correct: number, total: number) => {
+    const wrong = total - correct
+    return (correct * 2) - (wrong * 0.5)
+}
+
+const formatTime = (seconds: number) => {
+    const mins = Math.floor(seconds / 60)
+    const secs = Math.floor(seconds % 60)
+    return `${mins}m ${secs}s`
 }
 
 export default function MetricsPage() {
@@ -38,7 +48,6 @@ export default function MetricsPage() {
     const runEvaluation = async () => {
         setLoading(true)
         try {
-            // Call the UPSC solver API
             const response = await fetch('/api/metrics/run', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
@@ -52,6 +61,9 @@ export default function MetricsPage() {
             setLoading(false)
         }
     }
+
+    const marks = results ? calculateMarks(results.correctAnswers, results.totalQuestions) : 0
+    const maxMarks = results ? results.totalQuestions * 2 : 0
 
     return (
         <div className="min-h-screen bg-gray-50">
@@ -68,8 +80,9 @@ export default function MetricsPage() {
                 </div>
             </div>
 
-            {/* Stats Cards */}
+            {/* Stats Cards - 4 metrics */}
             <div className="grid gap-4 md:grid-cols-4 mb-8">
+                {/* Accuracy */}
                 <div className="rounded-2xl bg-white p-6 shadow-sm border border-gray-100">
                     <div className="flex items-center gap-3">
                         <div className="rounded-xl bg-emerald-100 p-3">
@@ -84,6 +97,7 @@ export default function MetricsPage() {
                     </div>
                 </div>
 
+                {/* Correct */}
                 <div className="rounded-2xl bg-white p-6 shadow-sm border border-gray-100">
                     <div className="flex items-center gap-3">
                         <div className="rounded-xl bg-blue-100 p-3">
@@ -98,30 +112,33 @@ export default function MetricsPage() {
                     </div>
                 </div>
 
+                {/* Time Taken */}
                 <div className="rounded-2xl bg-white p-6 shadow-sm border border-gray-100">
                     <div className="flex items-center gap-3">
                         <div className="rounded-xl bg-orange-100 p-3">
-                            <TrendingUp className="h-5 w-5 text-orange-600" />
+                            <Clock className="h-5 w-5 text-orange-600" />
                         </div>
                         <div>
-                            <p className="text-sm text-gray-500">LLM Calls</p>
+                            <p className="text-sm text-gray-500">Time Taken</p>
                             <p className="text-2xl font-bold text-gray-900">
-                                {results ? results.llmCalls.toLocaleString() : '--'}
+                                {results ? formatTime(results.timeSeconds) : '--'}
                             </p>
                         </div>
                     </div>
                 </div>
 
+                {/* Marks (UPSC: +2 correct, -0.5 wrong) */}
                 <div className="rounded-2xl bg-white p-6 shadow-sm border border-gray-100">
                     <div className="flex items-center gap-3">
                         <div className="rounded-xl bg-purple-100 p-3">
-                            <AlertCircle className="h-5 w-5 text-purple-600" />
+                            <Award className="h-5 w-5 text-purple-600" />
                         </div>
                         <div>
-                            <p className="text-sm text-gray-500">Tokens Used</p>
-                            <p className="text-2xl font-bold text-gray-900">
-                                {results ? `${(results.totalTokens / 1000).toFixed(0)}K` : '--'}
+                            <p className="text-sm text-gray-500">Marks</p>
+                            <p className={`text-2xl font-bold ${marks >= 0 ? 'text-gray-900' : 'text-red-600'}`}>
+                                {results ? `${marks.toFixed(1)}/${maxMarks}` : '--'}
                             </p>
+                            <p className="text-xs text-gray-400">+2 correct, -0.5 wrong</p>
                         </div>
                     </div>
                 </div>
